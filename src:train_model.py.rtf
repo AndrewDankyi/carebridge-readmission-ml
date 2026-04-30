@@ -1,0 +1,28 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww30040\viewh18900\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import pandas as pd\
+import joblib\
+from sklearn.model_selection import train_test_split\
+from sklearn.ensemble import RandomForestClassifier\
+from pathlib import Path\
+\
+# Load and Split\
+df = pd.read_csv("data/sample_readmission_data.csv")\
+X = df.drop(['patient_id', 'readmitted_30_days'], axis=1)\
+y = df['readmitted_30_days']\
+\
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\
+\
+# Train\
+model = RandomForestClassifier(n_estimators=100, random_state=42)\
+model.fit(X_train, y_train)\
+\
+# Save\
+Path("models").mkdir(exist_ok=True)\
+joblib.dump(model, "models/readmission_model.joblib")\
+print("\uc0\u9989  Model trained and saved to models/readmission_model.joblib")}
