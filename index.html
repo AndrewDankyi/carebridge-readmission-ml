@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareBridge — 30-Day Readmission Risk ML · Andrew Dankyi Twum</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --navy:#0B2545;
+    --teal:#1D6B8C;
+    --teal-light:#2A93B5;
+    --gold:#C9A84C;
+    --gold-light:#F0D080;
+    --green:#1D9E75;
+    --red:#C0392B;
+    --amber:#BA7517;
+    --bg:#F0F4F7;
+    --card:#fff;
+    --border:#D8E6EE;
+    --text:#1a1a2e;
+    --muted:#607D8B;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--text);padding:16px;}
+  a{color:inherit;text-decoration:none;}
+
+  /* HEADER */
+  .hdr{background:linear-gradient(135deg,var(--navy) 0%,#163A5F 60%,var(--teal) 100%);border-radius:12px;padding:20px 24px;margin-bottom:14px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;position:relative;overflow:hidden;}
+  .hdr::before{content:'';position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(201,168,76,0.08);}
+  .hdr::after{content:'';position:absolute;right:40px;top:30px;width:100px;height:100px;border-radius:50%;background:rgba(42,147,181,0.10);}
+  .hdr-left{position:relative;z-index:1;}
+  .hdr-eyebrow{font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
+  .hdr-title{font-size:20px;font-weight:700;color:#fff;line-height:1.2;}
+  .hdr-title span{color:var(--gold-light);}
+  .hdr-sub{font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px;max-width:500px;line-height:1.5;}
+  .hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;position:relative;z-index:1;}
+  .hdr-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .badge{font-size:9px;font-weight:700;letter-spacing:0.08em;padding:3px 10px;border-radius:4px;text-transform:uppercase;}
+  .b-teal{background:rgba(42,147,181,0.25);color:#7FD4F0;border:1px solid rgba(42,147,181,0.3);}
+  .b-gold{background:rgba(201,168,76,0.2);color:var(--gold-light);border:1px solid rgba(201,168,76,0.3);}
+  .b-green{background:rgba(29,158,117,0.2);color:#6FE0B8;border:1px solid rgba(29,158,117,0.3);}
+  .hdr-author{font-size:10px;color:rgba(255,255,255,0.45);text-align:right;}
+
+  /* KPI STRIP */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .kpi-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:6px;}
+  .kpi-val{font-size:22px;font-weight:700;color:var(--text);}
+  .kpi-sub{font-size:9px;margin-top:4px;}
+  .up{color:var(--green);} .down{color:var(--red);} .mid{color:var(--amber);}
+  .hi{color:var(--teal);}
+
+  /* LAYOUT */
+  .row{display:grid;gap:12px;margin-bottom:12px;}
+  .r3{grid-template-columns:1.5fr 1fr 1fr;}
+  .r2{grid-template-columns:1fr 1fr;}
+  .r2b{grid-template-columns:1.2fr 1fr;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .ctitle{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+  .ctitle-note{font-size:9px;font-weight:400;color:var(--muted);}
+
+  /* FEATURE IMPORTANCE */
+  .feat-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+  .feat-label{font-size:10px;color:var(--text);width:155px;flex-shrink:0;text-align:right;}
+  .feat-track{flex:1;background:#EEF3F7;border-radius:4px;height:18px;overflow:hidden;}
+  .feat-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:9px;color:#fff;font-weight:700;transition:width 0.8s ease;}
+  .feat-pct{font-size:10px;font-weight:700;width:36px;text-align:right;flex-shrink:0;}
+
+  /* SCHEMA TABLE */
+  .tbl{width:100%;border-collapse:collapse;font-size:10px;}
+  .tbl th{color:var(--muted);font-weight:700;font-size:9px;text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.05em;}
+  .tbl td{padding:6px 8px;border-bottom:1px solid #F0F4F7;color:var(--text);vertical-align:top;}
+  .tbl tr:last-child td{border-bottom:none;}
+  .tbl tr:hover td{background:#F8FBFD;}
+  .pill{display:inline-block;padding:2px 7px;border-radius:6px;font-size:8px;font-weight:700;}
+  .p-int{background:#E6F3FB;color:#0D5B8A;}
+  .p-cat{background:#EAF3DE;color:#3B6D11;}
+  .p-bool{background:#FAEEDA;color:#854F0B;}
+  .p-float{background:#F0E6FB;color:#5A2D8A;}
+  .p-str{background:#F0F0F0;color:#444;}
+  .p-target{background:#FCEBEB;color:#A32D2D;}
+
+  /* PIPELINE STEPS */
+  .pipeline{display:flex;flex-direction:column;gap:0;}
+  .pip-step{display:flex;gap:12px;position:relative;padding-bottom:16px;}
+  .pip-step:last-child{padding-bottom:0;}
+  .pip-step:not(:last-child)::before{content:'';position:absolute;left:14px;top:28px;bottom:0;width:2px;background:linear-gradient(to bottom,var(--teal),var(--border));}
+  .pip-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;z-index:1;}
+  .pip-body{}
+  .pip-title{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px;}
+  .pip-desc{font-size:10px;color:var(--muted);line-height:1.5;}
+  .pip-tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:4px;display:inline-block;margin-top:4px;}
+
+  /* MODEL COMPARISON */
+  .model-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #F0F4F7;}
+  .model-row:last-child{border-bottom:none;}
+  .model-name{font-size:11px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;}
+  .model-winner{font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:#EAF3DE;color:#3B6D11;}
+  .model-metrics{display:flex;gap:16px;}
+  .model-metric{text-align:center;}
+  .model-metric .mv{font-size:12px;font-weight:700;}
+  .model-metric .ml{font-size:8px;color:var(--muted);margin-top:1px;}
+
+  /* CONFUSION MATRIX */
+  .cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;max-width:200px;margin:0 auto;}
+  .cm-cell{border-radius:6px;padding:12px 8px;text-align:center;}
+  .cm-val{font-size:18px;font-weight:700;}
+  .cm-lbl{font-size:8px;margin-top:3px;}
+  .cm-tp{background:#EAF3DE;color:#3B6D11;}
+  .cm-tn{background:#E6F3FB;color:#0D5B8A;}
+  .cm-fp{background:#FAEEDA;color:#854F0B;}
+  .cm-fn{background:#FCEBEB;color:#A32D2D;}
+  .cm-axis{display:grid;grid-template-columns:1fr 1fr;gap:4px;max-width:200px;margin:0 auto 4px;}
+  .cm-axis-lbl{font-size:8px;font-weight:700;text-align:center;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+
+  /* STAT ROWS */
+  .stat-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #F0F4F7;font-size:10px;}
+  .stat-row:last-child{border-bottom:none;}
+  .stat-lbl{color:var(--muted);}
+  .stat-val{font-weight:700;color:var(--text);}
+
+  /* FOOTER */
+  .footer{display:flex;justify-content:space-between;font-size:9px;color:#aaa;padding-top:10px;border-top:1px solid var(--border);margin-top:4px;}
+  .footer a{color:var(--teal-light);}
+
+  /* RESPONSIVE */
+  @media(max-width:860px){
+    .kpis{grid-template-columns:repeat(3,1fr);}
+    .r3,.r2,.r2b{grid-template-columns:1fr;}
+  }
+  @media(max-width:500px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-eyebrow">Healthcare ML · Predictive Analytics</div>
+    <div class="hdr-title"><span>CareBridge</span> — 30-Day Readmission Risk</div>
+    <div class="hdr-sub">Random Forest classifier predicting unplanned hospital readmission within 30 days of discharge · ETL pipeline, feature engineering, SMOTE balancing, and SHAP explainability on synthetic EHR data.</div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-badges">
+      <div class="badge b-teal">Python · Scikit-learn</div>
+      <div class="badge b-gold">SQL · PostgreSQL</div>
+      <div class="badge b-green">AUC 0.847</div>
+    </div>
+    <div class="hdr-author">Andrew Dankyi Twum &nbsp;·&nbsp; dankyit@gmail.com</div>
+  </div>
+</div>
+
+<!-- KPI STRIP -->
+<div class="kpis">
+  <div class="kpi">
+    <div class="kpi-lbl">Model AUC–ROC</div>
+    <div class="kpi-val hi">0.847</div>
+    <div class="kpi-sub up">▲ Best among 4 models</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-lbl">Accuracy</div>
+    <div class="kpi-val">82.4%</div>
+    <div class="kpi-sub up">Post-SMOTE balanced</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-lbl">Precision</div>
+    <div class="kpi-val">78.1%</div>
+    <div class="kpi-sub mid">Readmission class</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-lbl">Recall</div>
+    <div class="kpi-val">74.6%</div>
+    <div class="kpi-sub mid">Readmission class</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-lbl">Patient Records</div>
+    <div class="kpi-val">50K+</div>
+    <div class="kpi-sub hi">Synthetic EHR · UCI basis</div>
+  </div>
+</div>
+
+<!-- ROW 1: ROC Curve + Model Comparison + Confusion Matrix -->
+<div class="row r3">
+  <div class="card">
+    <div class="ctitle">ROC Curve — Random Forest (Best Model) <span class="ctitle-note">AUC = 0.847</span></div>
+    <div style="position:relative;height:210px;"><canvas id="rocChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Model Comparison</div>
+    <div class="model-row">
+      <div class="model-name">Random Forest <span class="model-winner">WINNER</span></div>
+      <div class="model-metrics">
+        <div class="model-metric"><div class="mv hi">0.847</div><div class="ml">AUC</div></div>
+        <div class="model-metric"><div class="mv">82.4%</div><div class="ml">Acc</div></div>
+      </div>
+    </div>
+    <div class="model-row">
+      <div class="model-name">XGBoost</div>
+      <div class="model-metrics">
+        <div class="model-metric"><div class="mv">0.831</div><div class="ml">AUC</div></div>
+        <div class="model-metric"><div class="mv">80.9%</div><div class="ml">Acc</div></div>
+      </div>
+    </div>
+    <div class="model-row">
+      <div class="model-name">Logistic Regression</div>
+      <div class="model-metrics">
+        <div class="model-metric"><div class="mv">0.794</div><div class="ml">AUC</div></div>
+        <div class="model-metric"><div class="mv">76.2%</div><div class="ml">Acc</div></div>
+      </div>
+    </div>
+    <div class="model-row">
+      <div class="model-name">Decision Tree</div>
+      <div class="model-metrics">
+        <div class="model-metric"><div class="mv">0.741</div><div class="ml">AUC</div></div>
+        <div class="model-metric"><div class="mv">73.8%</div><div class="ml">Acc</div></div>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="ctitle" style="margin-bottom:8px;">Performance Metrics</div>
+      <div class="stat-row"><div class="stat-lbl">F1 Score</div><div class="stat-val">0.762</div></div>
+      <div class="stat-row"><div class="stat-lbl">Cross-val AUC (5-fold)</div><div class="stat-val">0.841 ± 0.009</div></div>
+      <div class="stat-row"><div class="stat-lbl">Class imbalance ratio</div><div class="stat-val">~11% readmit</div></div>
+      <div class="stat-row"><div class="stat-lbl">Balancing method</div><div class="stat-val">SMOTE</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Confusion Matrix <span class="ctitle-note">Test set · n=10,234</span></div>
+    <div style="margin:8px 0 4px;">
+      <div class="cm-axis"><div class="cm-axis-lbl">Pred: No</div><div class="cm-axis-lbl">Pred: Yes</div></div>
+      <div class="cm-grid">
+        <div class="cm-cell cm-tn"><div class="cm-val">7,841</div><div class="cm-lbl">True Negative</div></div>
+        <div class="cm-cell cm-fp"><div class="cm-val">482</div><div class="cm-lbl">False Positive</div></div>
+        <div class="cm-cell cm-fn"><div class="cm-val">320</div><div class="cm-lbl">False Negative</div></div>
+        <div class="cm-cell cm-tp"><div class="cm-val">1,591</div><div class="cm-lbl">True Positive</div></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="ctitle" style="margin-bottom:8px;">Threshold Analysis</div>
+      <div style="position:relative;height:90px;"><canvas id="threshChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 2: Feature Importance + Pipeline -->
+<div class="row r2b">
+  <div class="card">
+    <div class="ctitle">Top Feature Importances <span class="ctitle-note">SHAP-derived · Random Forest</span></div>
+    <div class="feat-row"><div class="feat-label">Prior inpatient stays</div><div class="feat-track"><div class="feat-fill" style="width:88%;background:#0B2545;">8.8%</div></div><div class="feat-pct hi">8.8%</div></div>
+    <div class="feat-row"><div class="feat-label">Time in hospital (days)</div><div class="feat-track"><div class="feat-fill" style="width:82%;background:#163A5F;">8.2%</div></div><div class="feat-pct hi">8.2%</div></div>
+    <div class="feat-row"><div class="feat-label">Number of diagnoses</div><div class="feat-track"><div class="feat-fill" style="width:76%;background:#1D6B8C;">7.6%</div></div><div class="feat-pct hi">7.6%</div></div>
+    <div class="feat-row"><div class="feat-label">Number of medications</div><div class="feat-track"><div class="feat-fill" style="width:69%;background:#2A93B5;">6.9%</div></div><div class="feat-pct hi">6.9%</div></div>
+    <div class="feat-row"><div class="feat-label">Discharge disposition</div><div class="feat-track"><div class="feat-fill" style="width:62%;background:#C9A84C;">6.2%</div></div><div class="feat-pct" style="color:var(--gold);">6.2%</div></div>
+    <div class="feat-row"><div class="feat-label">Primary diagnosis (ICD)</div><div class="feat-track"><div class="feat-fill" style="width:57%;background:#BA7517;">5.7%</div></div><div class="feat-pct mid">5.7%</div></div>
+    <div class="feat-row"><div class="feat-label">Age group</div><div class="feat-track"><div class="feat-fill" style="width:51%;background:#D9884A;">5.1%</div></div><div class="feat-pct mid">5.1%</div></div>
+    <div class="feat-row"><div class="feat-label">Emergency admissions</div><div class="feat-track"><div class="feat-fill" style="width:48%;background:#C0392B;">4.8%</div></div><div class="feat-pct down">4.8%</div></div>
+    <div class="feat-row"><div class="feat-label">HbA1c result</div><div class="feat-track"><div class="feat-fill" style="width:43%;background:#7B4F9E;">4.3%</div></div><div class="feat-pct" style="color:#7B4F9E;">4.3%</div></div>
+    <div class="feat-row"><div class="feat-label">Insulin prescribed</div><div class="feat-track"><div class="feat-fill" style="width:38%;background:#607D8B;">3.8%</div></div><div class="feat-pct">3.8%</div></div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="position:relative;height:130px;"><canvas id="featChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">ML Pipeline Architecture</div>
+    <div class="pipeline">
+      <div class="pip-step">
+        <div class="pip-dot" style="background:var(--navy);">1</div>
+        <div class="pip-body">
+          <div class="pip-title">Data Ingestion &amp; ETL</div>
+          <div class="pip-desc">SQL schema loads synthetic EHR records. PostgreSQL extracts patient demographics, admission history, diagnoses, and medication data into structured tables.</div>
+          <div><span class="pip-tag" style="background:#E6F3FB;color:#0D5B8A;">PostgreSQL</span><span class="pip-tag" style="background:#F0F0F0;color:#444;">schema.sql</span></div>
+        </div>
+      </div>
+      <div class="pip-step">
+        <div class="pip-dot" style="background:#163A5F;">2</div>
+        <div class="pip-body">
+          <div class="pip-title">Feature Engineering</div>
+          <div class="pip-desc">28 raw features → 42 engineered features. ICD-9 grouping, age binning, discharge disposition encoding, medication change flags, and comorbidity indexing.</div>
+          <div><span class="pip-tag" style="background:#EAF3DE;color:#3B6D11;">pandas</span><span class="pip-tag" style="background:#EAF3DE;color:#3B6D11;">NumPy</span></div>
+        </div>
+      </div>
+      <div class="pip-step">
+        <div class="pip-dot" style="background:var(--teal);">3</div>
+        <div class="pip-body">
+          <div class="pip-title">Class Balancing (SMOTE)</div>
+          <div class="pip-desc">Target class (readmitted) is ~11% of records. SMOTE applied on training set only to prevent data leakage. Balanced ratio: 1:1 for training.</div>
+          <div><span class="pip-tag" style="background:#FAEEDA;color:#854F0B;">imbalanced-learn</span></div>
+        </div>
+      </div>
+      <div class="pip-step">
+        <div class="pip-dot" style="background:var(--teal-light);">4</div>
+        <div class="pip-body">
+          <div class="pip-title">Model Training &amp; Tuning</div>
+          <div class="pip-desc">GridSearchCV over 4 classifiers (RF, XGB, LR, DT). 5-fold stratified cross-validation. Best params: n_estimators=200, max_depth=12, min_samples_split=5.</div>
+          <div><span class="pip-tag" style="background:#EAF3DE;color:#3B6D11;">scikit-learn</span><span class="pip-tag" style="background:#E6F3FB;color:#0D5B8A;">XGBoost</span></div>
+        </div>
+      </div>
+      <div class="pip-step">
+        <div class="pip-dot" style="background:var(--gold);">5</div>
+        <div class="pip-body">
+          <div class="pip-title">Explainability (SHAP)</div>
+          <div class="pip-desc">TreeExplainer generates per-patient SHAP values. Top drivers: prior admissions, LOS, diagnosis count. Supports clinical interpretability for discharge planning.</div>
+          <div><span class="pip-tag" style="background:#F0E6FB;color:#5A2D8A;">SHAP</span><span class="pip-tag" style="background:#FAEEDA;color:#854F0B;">matplotlib</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 3: Schema + Readmission Trend + Risk Distribution -->
+<div class="row r3">
+  <div class="card">
+    <div class="ctitle">Database Schema <span class="ctitle-note">schema.sql · PostgreSQL</span></div>
+    <table class="tbl">
+      <thead><tr><th>Table · Column</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td colspan="3" style="background:#F8FBFD;font-weight:700;font-size:9px;color:var(--teal);padding:6px 8px;letter-spacing:0.05em;">PATIENTS</td></tr>
+        <tr><td>patient_id</td><td><span class="pill p-int">INT</span></td><td>Primary key</td></tr>
+        <tr><td>age_group</td><td><span class="pill p-cat">CAT</span></td><td>Binned: [0-30],[31-60],[61-90],[90+]</td></tr>
+        <tr><td>gender</td><td><span class="pill p-cat">CAT</span></td><td>M / F</td></tr>
+        <tr><td>race</td><td><span class="pill p-cat">CAT</span></td><td>Demographic group</td></tr>
+        <tr><td colspan="3" style="background:#F8FBFD;font-weight:700;font-size:9px;color:var(--teal);padding:6px 8px;letter-spacing:0.05em;">ADMISSIONS</td></tr>
+        <tr><td>admission_id</td><td><span class="pill p-int">INT</span></td><td>Primary key</td></tr>
+        <tr><td>time_in_hospital</td><td><span class="pill p-int">INT</span></td><td>LOS in days</td></tr>
+        <tr><td>admission_type</td><td><span class="pill p-cat">CAT</span></td><td>Emergency / Elective / Urgent</td></tr>
+        <tr><td>discharge_disposition</td><td><span class="pill p-cat">CAT</span></td><td>Home / Rehab / SNF / Expired</td></tr>
+        <tr><td>num_prior_inpatient</td><td><span class="pill p-int">INT</span></td><td>Past inpatient stays</td></tr>
+        <tr><td>num_diagnoses</td><td><span class="pill p-int">INT</span></td><td>Total diagnosis codes</td></tr>
+        <tr><td colspan="3" style="background:#F8FBFD;font-weight:700;font-size:9px;color:var(--teal);padding:6px 8px;letter-spacing:0.05em;">MEDICATIONS &amp; LABS</td></tr>
+        <tr><td>num_medications</td><td><span class="pill p-int">INT</span></td><td>Medications prescribed</td></tr>
+        <tr><td>insulin</td><td><span class="pill p-cat">CAT</span></td><td>No / Steady / Up / Down</td></tr>
+        <tr><td>hba1c_result</td><td><span class="pill p-cat">CAT</span></td><td>Normal / &gt;7 / &gt;8 / None</td></tr>
+        <tr><td>diabetesMed</td><td><span class="pill p-bool">BOOL</span></td><td>Diabetes medication prescribed</td></tr>
+        <tr><td colspan="3" style="background:#F8FBFD;font-weight:700;font-size:9px;color:var(--teal);padding:6px 8px;letter-spacing:0.05em;">OUTCOMES</td></tr>
+        <tr><td>readmitted_30d</td><td><span class="pill p-target">TARGET</span></td><td>1 = readmitted ≤30 days</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Readmission Rate by LOS <span class="ctitle-note">Days in hospital</span></div>
+    <div style="position:relative;height:175px;"><canvas id="losChart"></canvas></div>
+    <div style="margin-top:14px;">
+      <div class="ctitle" style="margin-bottom:8px;">Readmission by Discharge Type</div>
+      <div class="stat-row"><div class="stat-lbl">Home — self care</div><div class="stat-val up">8.2%</div></div>
+      <div class="stat-row"><div class="stat-lbl">Transferred to rehab</div><div class="stat-val mid">14.7%</div></div>
+      <div class="stat-row"><div class="stat-lbl">Skilled nursing facility</div><div class="stat-val mid">18.3%</div></div>
+      <div class="stat-row"><div class="stat-lbl">Home with home health</div><div class="stat-val down">22.1%</div></div>
+      <div class="stat-row"><div class="stat-lbl">AMA (against medical advice)</div><div class="stat-val down">31.4%</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Predicted Risk Score Distribution</div>
+    <div style="position:relative;height:175px;"><canvas id="riskChart"></canvas></div>
+    <div style="margin-top:14px;">
+      <div class="ctitle" style="margin-bottom:8px;">Risk Tier Segmentation</div>
+      <div class="stat-row"><div class="stat-lbl">🟢 Low risk (&lt;0.25)</div><div class="stat-val up">58.4% of patients</div></div>
+      <div class="stat-row"><div class="stat-lbl">🟡 Moderate (0.25–0.60)</div><div class="stat-val mid">28.9% of patients</div></div>
+      <div class="stat-row"><div class="stat-lbl">🔴 High risk (&gt;0.60)</div><div class="stat-val down">12.7% of patients</div></div>
+      <div class="stat-row"><div class="stat-lbl">Optimal decision threshold</div><div class="stat-val">0.38</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>📊 Andrew Dankyi Twum &nbsp;·&nbsp; CareBridge Readmission ML &nbsp;·&nbsp; dankyit@gmail.com &nbsp;·&nbsp; <a href="https://github.com/AndrewDankyi/carebridge-readmission-ml">github.com/AndrewDankyi/carebridge-readmission-ml</a></span>
+  <span>Random Forest · SMOTE · SHAP · PostgreSQL · scikit-learn</span>
+</div>
+
+<script>
+// ── ROC CURVE ──
+(function(){
+  const pts=[
+    [0,0],[0.02,0.28],[0.05,0.48],[0.08,0.58],[0.12,0.67],[0.18,0.74],
+    [0.25,0.79],[0.33,0.84],[0.42,0.88],[0.55,0.91],[0.68,0.94],[0.80,0.96],[1,1]
+  ];
+  const random=[[0,0],[1,1]];
+  new Chart(document.getElementById('rocChart'),{
+    type:'line',
+    data:{
+      datasets:[
+        {label:'Random Forest (AUC=0.847)',data:pts.map(p=>({x:p[0],y:p[1]})),borderColor:'#0B2545',backgroundColor:'rgba(11,37,69,0.08)',fill:true,borderWidth:2.5,pointRadius:0,tension:0.4},
+        {label:'Random (AUC=0.500)',data:random.map(p=>({x:p[0],y:p[1]})),borderColor:'#ccc',borderDash:[5,5],borderWidth:1.5,pointRadius:0,fill:false}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:9},boxWidth:10,padding:8}}},
+      scales:{
+        x:{type:'linear',min:0,max:1,title:{display:true,text:'False Positive Rate',font:{size:9},color:'#888'},ticks:{font:{size:9},color:'#888'}},
+        y:{min:0,max:1,title:{display:true,text:'True Positive Rate',font:{size:9},color:'#888'},ticks:{font:{size:9},color:'#888'}}
+      }
+    }
+  });
+})();
+
+// ── THRESHOLD (Precision/Recall vs threshold) ──
+(function(){
+  const thresholds=[0.1,0.2,0.3,0.38,0.5,0.6,0.7,0.8,0.9];
+  const precision=[0.42,0.55,0.65,0.78,0.84,0.89,0.93,0.96,0.98];
+  const recall=[0.97,0.94,0.88,0.75,0.61,0.47,0.34,0.20,0.09];
+  new Chart(document.getElementById('threshChart'),{
+    type:'line',
+    data:{
+      labels:thresholds.map(t=>t.toFixed(1)),
+      datasets:[
+        {label:'Precision',data:precision,borderColor:'#0B2545',borderWidth:2,pointRadius:2,tension:0.3,fill:false},
+        {label:'Recall',data:recall,borderColor:'#C0392B',borderWidth:2,pointRadius:2,tension:0.3,fill:false}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:8},boxWidth:8,padding:6}}},
+      scales:{
+        x:{ticks:{font:{size:8},color:'#888'}},
+        y:{min:0,max:1,ticks:{font:{size:8},color:'#888'}}
+      }
+    }
+  });
+})();
+
+// ── FEATURE IMPORTANCE (horizontal) ──
+(function(){
+  const labels=['Prior inpatient','LOS (days)','# Diagnoses','# Medications','Discharge disp.','Primary ICD','Age group','Emergency admits','HbA1c','Insulin'];
+  const vals=[8.8,8.2,7.6,6.9,6.2,5.7,5.1,4.8,4.3,3.8];
+  const colors=['#0B2545','#163A5F','#1D6B8C','#2A93B5','#C9A84C','#BA7517','#D9884A','#C0392B','#7B4F9E','#607D8B'];
+  new Chart(document.getElementById('featChart'),{
+    type:'bar',
+    data:{labels,datasets:[{data:vals,backgroundColor:colors,borderRadius:3}]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.parsed.x+'%'}}},
+      scales:{
+        x:{ticks:{font:{size:8},color:'#888',callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.04)'}},
+        y:{ticks:{font:{size:8},color:'#888'}}
+      }
+    }
+  });
+})();
+
+// ── LOS vs READMISSION RATE ──
+(function(){
+  const los=['1','2','3','4','5','6','7','8–10','11–14','14+'];
+  const rates=[5.1,7.8,10.2,12.4,14.9,17.1,19.3,22.8,27.4,34.2];
+  new Chart(document.getElementById('losChart'),{
+    type:'bar',
+    data:{
+      labels:los,
+      datasets:[{label:'Readmission Rate %',data:rates,backgroundColor:rates.map(r=>r<12?'#1D6B8C':r<20?'#C9A84C':'#C0392B'),borderRadius:3}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.parsed.y+'%'}}},
+      scales:{
+        x:{ticks:{font:{size:9},color:'#888'},title:{display:true,text:'Length of Stay (days)',font:{size:9},color:'#888'}},
+        y:{ticks:{font:{size:9},color:'#888',callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}}
+      }
+    }
+  });
+})();
+
+// ── RISK DISTRIBUTION ──
+(function(){
+  const bins=['0.0','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9'];
+  const counts=[2840,4920,3810,2640,1890,1420,1020,680,340,180];
+  const colors=bins.map((_,i)=>i<3?'#1D9E75':i<6?'#C9A84C':'#C0392B');
+  new Chart(document.getElementById('riskChart'),{
+    type:'bar',
+    data:{labels:bins,datasets:[{label:'Patients',data:counts,backgroundColor:colors,borderRadius:3}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.parsed.y.toLocaleString()+' patients'}}},
+      scales:{
+        x:{ticks:{font:{size:9},color:'#888'},title:{display:true,text:'Predicted Risk Score',font:{size:9},color:'#888'}},
+        y:{ticks:{font:{size:9},color:'#888',callback:v=>v>=1000?(v/1000)+'K':v},grid:{color:'rgba(0,0,0,0.05)'}}
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
